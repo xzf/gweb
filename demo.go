@@ -3,13 +3,37 @@ package main
 import (
 	"fmt"
 	"gweb"
-	"net/http"
 )
 
+type web struct {
+	gweb.WebApi
+}
+
+//func(a web)FuncA(){
+//	fmt.Println(111)
+//}
+
 func main() {
-	err := http.ListenAndServe(":8001", gweb.WebApi{})
-	if err != nil {
-		fmt.Println("81aiwu5pox", "http.ListenAndServe", err)
-	}
-	gweb.WaitForKill()
+	w := web{}
+	fmt.Println("------------")
+	gweb.NewHttpServer("", &w)
+	fmt.Println("------------")
+}
+
+type AReq struct {
+	As string
+	Ai int
+}
+
+func (w web) A(req AReq) {
+	fmt.Println(req)
+}
+
+type BReq struct {
+	Bs string
+	Bi int
+}
+
+func (w web) B(req BReq) {
+	fmt.Println(req)
 }
