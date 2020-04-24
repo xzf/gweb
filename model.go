@@ -9,7 +9,12 @@ import (
 	"syscall"
 )
 
-func NewHttpServer(addr string, obj interface{}) { //obj 必须用指针
+func NewHttpsServer(addr string,obj interface{}){
+
+}
+
+func NewHttpServer(addr string, obj interface{}) {
+	//todo if obk not a ptr ,define a var to get ptr for obj
 	objType := reflect.TypeOf(obj)
 	objValue := reflect.ValueOf(obj)
 	if objValue.Kind() != reflect.Ptr {
@@ -34,7 +39,7 @@ func NewHttpServer(addr string, obj interface{}) { //obj 必须用指针
 			fmt.Println(methodName, inPara.Name(), inPara.Field(j).Name, inPara.Field(j).Type)
 		}
 
-		//去掉WebApi的method
+		//remove  methods for WebApi
 		//if methodName == "" {
 		//	continue
 		//}
