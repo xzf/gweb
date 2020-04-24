@@ -10,7 +10,7 @@ Mention this repo in your product web site or your repo.
 And you also can buy me a coffee.    
 tks.
 
-payapl:  xzf12315@gmail.com    
+payapl:  https://paypal.me/xzf1    
 alipay:    
 ![image](https://raw.githubusercontent.com/xzf/gweb/payment_img/alipay.png)    
 wechat:    
