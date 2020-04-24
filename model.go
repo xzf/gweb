@@ -1,27 +1,32 @@
-package main
+package gweb
 
 import (
-	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
-	"reflect"
 	"syscall"
+	"reflect"
+	"fmt"
 )
 
 func NewHttpsServer(addr string,obj interface{}){
-
+	parseWebApiObj(obj)
 }
 
 func NewHttpServer(addr string, obj interface{}) {
+	parseWebApiObj(obj)
+}
+
+func parseWebApiObj(obj interface{}){
 	//todo if obk not a ptr ,define a var to get ptr for obj
 	objType := reflect.TypeOf(obj)
 	objValue := reflect.ValueOf(obj)
+	var objPtr = obj
 	if objValue.Kind() != reflect.Ptr {
-		panic("obj need ptr")
+		objPtr = &obj
+		objValue = reflect.ValueOf(objPtr)
 	}
 	methodNum := objType.NumMethod()
-	//methodMap := map[string]func(req http.Request, respResp http.ResponseWriter){}
 	methodMap := map[string]func(req http.Request, respResp http.ResponseWriter){}
 	for i := 0; i < methodNum; i++ {
 		methodName := objType.Method(i).Name
