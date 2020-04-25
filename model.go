@@ -1,3 +1,9 @@
+/*
+ * Author : xzf
+ * Time    : 2020-04-26 00:50:22
+ * Email   : xpoony@163.com
+ */
+
 package gweb
 
 import (
@@ -9,15 +15,29 @@ import (
 	"fmt"
 )
 
-func NewHttpsServer(addr string,obj interface{}){
-	parseWebApiObj(obj)
+func NewHttpsServer(addr string, obj interface{}) {
+	//todo tls config, I think this thing just need call a check tls func before call http method, study this later.
+	//ParseWebApiObj(obj)
 }
 
 func NewHttpServer(addr string, obj interface{}) {
-	parseWebApiObj(obj)
+	methodMap := map[string]func(writer *http.ResponseWriter, request *http.Request){}
+	http.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
+		path := request.URL.Path
+		method, ok := methodMap[path]
+		if !ok {
+			writer.WriteHeader(404)
+			//todo set 404 page
+			return
+		}
+		//need ptr for http.ResponseWriter
+		method(&writer, request)
+	})
+	http.ListenAndServe(addr, nil)
+	WaitForKill()
 }
 
-func parseWebApiObj(obj interface{}){
+func ParseWebApiObj(obj interface{}) {
 	//todo if obk not a ptr ,define a var to get ptr for obj
 	objType := reflect.TypeOf(obj)
 	objValue := reflect.ValueOf(obj)
@@ -27,14 +47,42 @@ func parseWebApiObj(obj interface{}){
 		objValue = reflect.ValueOf(objPtr)
 	}
 	methodNum := objType.NumMethod()
-	methodMap := map[string]func(req http.Request, respResp http.ResponseWriter){}
+	methodMap := map[string]func(webApi WebApi, in ...interface{}){}
+	for i := 0; i < objValue.NumMethod(); i++ {
+		method := objValue.Method(i)
+		in := []reflect.Value{}
+		for ii := 0; ii < method.Type().NumIn(); ii++ {
+			tt := method.Type().In(ii)
+			switch tt.Kind() {
+			case reflect.Struct:
+				for iti := 0; iti < tt.NumField(); iti++ {
+					itf := tt.Field(iti)
+					fmt.Println(tt.Name(), itf.Name, itf.Type)
+
+				}
+			default:
+				fmt.Println("unsupport method para type", tt.Kind().String())
+				return
+			}
+			//p:=reflect.New(tt)
+
+			in = append(in, )
+			fmt.Println(tt.Name())
+		}
+		//method.Call([]reflect.Value{
+		//
+		//})
+	}
 	for i := 0; i < methodNum; i++ {
 		methodName := objType.Method(i).Name
 		method := objValue.Method(i)
+		//for ii:=0;i<objType.NumIn();ii++{
+		//	inType:=objType.In(ii)
+		//}
 		//para := reflect.New(inPara).Type()
 		//fmt.Println(methodName, " | ", method.Type.In(1))
 
-		methodMap[methodName] = func(req http.Request, respResp http.ResponseWriter) {
+		methodMap[methodName] = func(webApi WebApi, in ...interface{}) {
 			reflect.New(objType)
 			method.Call([]reflect.Value{})
 		}

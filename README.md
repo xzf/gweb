@@ -14,6 +14,6 @@ tks.
       - link: https://paypal.me/xzf1  
       - email: xzf12315@gmail.com
  - alipay qrcode:    
-![image](https://raw.githubusercontent.com/xzf/gweb/payment_img/alipay.png)    
+![image](https://i.ibb.co/94ByZQq/alipay.png)    
  - wechat qrcode:    
-![image](https://raw.githubusercontent.com/xzf/gweb/payment_img/wechat.png)   
+![image](https://i.ibb.co/Q94d731/wechat.png)   
