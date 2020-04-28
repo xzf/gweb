@@ -15,33 +15,22 @@ import (
 	"fmt"
 )
 
-func NewHttpsServer(addr string, obj interface{}) {
-	//todo tls config, I think this thing just need call a check tls func before call http method, study this later.
-	//ParseWebApiObj(obj)
-}
-
 type samplePara struct {
 	QSingleMap map[string]string
 	QMultiMap map[string][]string
-	PostBody []byte
+	Body []byte
 	IsBodyJson bool
+	originRequest *http.Request
 }
 
-func NewHttpServer(addr string, obj interface{}) {
-	methodMap := map[string]func(writer *http.ResponseWriter, request *http.Request){}
-	http.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
-		path := request.URL.Path
-		method, ok := methodMap[path]
-		if !ok {
-			writer.WriteHeader(404)
-			//todo set 404 page
-			return
-		}
-		//need ptr for http.ResponseWriter
-		method(&writer, request)
-	})
-	http.ListenAndServe(addr, nil)
-	waitForKill()
+type WebApi struct {
+	methodMap map[string]func(req *http.Request, respResp http.ResponseWriter)
+}
+
+func waitForKill() {
+	ch := make(chan os.Signal)
+	signal.Notify(ch, os.Interrupt, os.Kill, syscall.SIGTERM)
+	<-ch
 }
 
 func ParseWebApiObj(obj interface{}) {
@@ -106,14 +95,4 @@ func ParseWebApiObj(obj interface{}) {
 
 		//fmt.Println(objValue.Method(i).String())
 	}
-}
-
-type WebApi struct {
-	methodMap map[string]func(req http.Request, respResp http.ResponseWriter)
-}
-
-func waitForKill() {
-	ch := make(chan os.Signal)
-	signal.Notify(ch, os.Interrupt, os.Kill, syscall.SIGTERM)
-	<-ch
 }
