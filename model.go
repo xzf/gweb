@@ -20,6 +20,13 @@ func NewHttpsServer(addr string, obj interface{}) {
 	//ParseWebApiObj(obj)
 }
 
+type samplePara struct {
+	QSingleMap map[string]string
+	QMultiMap map[string][]string
+	PostBody []byte
+	IsBodyJson bool
+}
+
 func NewHttpServer(addr string, obj interface{}) {
 	methodMap := map[string]func(writer *http.ResponseWriter, request *http.Request){}
 	http.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
@@ -34,7 +41,7 @@ func NewHttpServer(addr string, obj interface{}) {
 		method(&writer, request)
 	})
 	http.ListenAndServe(addr, nil)
-	WaitForKill()
+	waitForKill()
 }
 
 func ParseWebApiObj(obj interface{}) {
@@ -47,10 +54,10 @@ func ParseWebApiObj(obj interface{}) {
 		objValue = reflect.ValueOf(objPtr)
 	}
 	methodNum := objType.NumMethod()
-	methodMap := map[string]func(webApi WebApi, in ...interface{}){}
+	methodMap := map[string]func(in ...interface{}){}
 	for i := 0; i < objValue.NumMethod(); i++ {
 		method := objValue.Method(i)
-		in := []reflect.Value{}
+		var in []reflect.Value
 		for ii := 0; ii < method.Type().NumIn(); ii++ {
 			tt := method.Type().In(ii)
 			switch tt.Kind() {
@@ -82,7 +89,7 @@ func ParseWebApiObj(obj interface{}) {
 		//para := reflect.New(inPara).Type()
 		//fmt.Println(methodName, " | ", method.Type.In(1))
 
-		methodMap[methodName] = func(webApi WebApi, in ...interface{}) {
+		methodMap[methodName] = func(in ...interface{}) {
 			reflect.New(objType)
 			method.Call([]reflect.Value{})
 		}
@@ -91,7 +98,6 @@ func ParseWebApiObj(obj interface{}) {
 		for j := 0; j < inPara.NumField(); j++ {
 			fmt.Println(methodName, inPara.Name(), inPara.Field(j).Name, inPara.Field(j).Type)
 		}
-
 		//remove  methods for WebApi
 		//if methodName == "" {
 		//	continue
@@ -106,7 +112,7 @@ type WebApi struct {
 	methodMap map[string]func(req http.Request, respResp http.ResponseWriter)
 }
 
-func WaitForKill() {
+func waitForKill() {
 	ch := make(chan os.Signal)
 	signal.Notify(ch, os.Interrupt, os.Kill, syscall.SIGTERM)
 	<-ch
