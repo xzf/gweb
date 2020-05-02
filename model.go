@@ -11,8 +11,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"reflect"
-	"fmt"
 )
 
 type samplePara struct {
@@ -21,10 +19,11 @@ type samplePara struct {
 	Body []byte
 	IsBodyJson bool
 	originRequest *http.Request
+	writer http.ResponseWriter
 }
 
 type WebApi struct {
-	methodMap map[string]func(req *http.Request, respResp http.ResponseWriter)
+	methodMap map[string]func(samplePara)
 }
 
 func waitForKill() {
@@ -33,66 +32,3 @@ func waitForKill() {
 	<-ch
 }
 
-func ParseWebApiObj(obj interface{}) {
-	//todo if obk not a ptr ,define a var to get ptr for obj
-	objType := reflect.TypeOf(obj)
-	objValue := reflect.ValueOf(obj)
-	var objPtr = obj
-	if objValue.Kind() != reflect.Ptr {
-		objPtr = &obj
-		objValue = reflect.ValueOf(objPtr)
-	}
-	methodNum := objType.NumMethod()
-	methodMap := map[string]func(in ...interface{}){}
-	for i := 0; i < objValue.NumMethod(); i++ {
-		method := objValue.Method(i)
-		var in []reflect.Value
-		for ii := 0; ii < method.Type().NumIn(); ii++ {
-			tt := method.Type().In(ii)
-			switch tt.Kind() {
-			case reflect.Struct:
-				for iti := 0; iti < tt.NumField(); iti++ {
-					itf := tt.Field(iti)
-					fmt.Println(tt.Name(), itf.Name, itf.Type)
-
-				}
-			default:
-				fmt.Println("unsupport method para type", tt.Kind().String())
-				return
-			}
-			//p:=reflect.New(tt)
-
-			in = append(in, )
-			fmt.Println(tt.Name())
-		}
-		//method.Call([]reflect.Value{
-		//
-		//})
-	}
-	for i := 0; i < methodNum; i++ {
-		methodName := objType.Method(i).Name
-		method := objValue.Method(i)
-		//for ii:=0;i<objType.NumIn();ii++{
-		//	inType:=objType.In(ii)
-		//}
-		//para := reflect.New(inPara).Type()
-		//fmt.Println(methodName, " | ", method.Type.In(1))
-
-		methodMap[methodName] = func(in ...interface{}) {
-			reflect.New(objType)
-			method.Call([]reflect.Value{})
-		}
-		fmt.Println(objType.Method(i).Type.NumIn())
-		inPara := objType.Method(i).Type.In(1)
-		for j := 0; j < inPara.NumField(); j++ {
-			fmt.Println(methodName, inPara.Name(), inPara.Field(j).Name, inPara.Field(j).Type)
-		}
-		//remove  methods for WebApi
-		//if methodName == "" {
-		//	continue
-		//}
-		//method := objValue.Method(i)
-
-		//fmt.Println(objValue.Method(i).String())
-	}
-}

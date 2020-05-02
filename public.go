@@ -15,6 +15,9 @@ func NewHttpsServer(addr string, obj interface{}) {
 	//ParseWebApiObj(obj)
 }
 
+
+
+
 func NewHttpServer(addr string, obj interface{}) {
 	methodMap := map[string]func(writer http.ResponseWriter, request *http.Request){}
 	http.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
