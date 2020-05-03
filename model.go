@@ -16,10 +16,13 @@ import (
 type samplePara struct {
 	QSingleMap map[string]string
 	QMultiMap map[string][]string
+	PostSingleMap map[string]string
+	PostMultiMap map[string][]string
 	Body []byte
 	IsBodyJson bool
 	originRequest *http.Request
 	writer http.ResponseWriter
+	httpMethod string
 }
 
 type WebApi struct {

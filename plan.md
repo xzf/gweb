@@ -20,16 +20,6 @@ call func
 api func para type 
 
 func() // no para
+func (struct) //strut any level field can't be ptr 
 
-//baseType mean go base type ,unsupport type : complex、chan、ptr and their slice type  
-func(baseType)
-func(baseType,baseType)
-func(baseType,baseType,baseType)//Not recommended too much baseType para
-...
-func(baseType,...,baseType)   
-
-//strut any level field can't be ptr 
-func (struct)
-
-!!!!
-can't be func (struct,baseType)  or func (baseType,struct)
+//because golang reflect can get func para name, golang base type unsupport 
