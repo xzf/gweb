@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"strconv"
 	"fmt"
+	"runtime"
+	"strings"
 )
 
 var logFunc func(string)
@@ -570,6 +572,12 @@ for i := 0; i < methodNum; i++ {
 	}
 */
 
-func SetDebugMode() {
-	isDebug = true
+
+
+func getGoroutineId() string {
+	var buf [128]byte
+	runtime.Stack(buf[:], false)
+	allInfo := string(buf[10:])
+	n := strings.Index(allInfo, " ")
+	return allInfo[:n]
 }

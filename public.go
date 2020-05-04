@@ -50,3 +50,7 @@ func NewHttpServer(addr string, obj interface{}) {
 	http.ListenAndServe(addr, nil)
 	waitForKill()
 }
+
+func SetDebugMode() {
+	isDebug = true
+}
