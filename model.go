@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"sync"
 )
 
 type samplePara struct {
@@ -26,7 +27,21 @@ type samplePara struct {
 }
 
 type WebApi struct {
+	id string
 	methodMap map[string]func(samplePara)
+	httpCtxMap map[string]*httpCtx
+	httpCtxLock sync.Mutex
+}
+
+type httpCtx struct {
+	writer http.ResponseWriter
+	request *http.Request
+}
+
+type webApiInterface interface {
+	WriteBody(body []byte) (ok bool)
+	GetGoRequest() (req *http.Request, ok bool)
+	SetWriter(w http.ResponseWriter, req *http.Request)
 }
 
 func waitForKill() {

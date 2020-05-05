@@ -44,3 +44,5 @@ func(a WebApi)WriteBody(str string){// no must to be string para
     ctx.writer.Write([]byte(str))
 }
 ```
+
+study struct func、interface func、struct obj 

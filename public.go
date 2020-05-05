@@ -17,7 +17,7 @@ import (
 //	//ParseWebApiObj(obj)
 //}
 
-func NewHttpServer(addr string, obj interface{}) {
+func NewHttpServer(addr string, obj webApiInterface) {
 	if logFunc == nil {
 		logFunc = func(logStr string) {
 			fmt.Println(logStr)
@@ -33,6 +33,8 @@ func NewHttpServer(addr string, obj interface{}) {
 			return
 		}
 		path := strings.Trim(request.URL.Path,"/")
+		obj.SetWriter(writer,request) //interface call
+		debugLog("o09lp1lc4 HandleFunc id",getGoroutineId())
 		debugLog("9bb8941zd call api:", path)
 		method, ok := methodMap[strings.Trim(path,"/")]
 		if !ok {

@@ -25,7 +25,14 @@ func parseWebApiObj(obj interface{}) map[string]func(samplePara) {
 	methodMap := map[string]func(samplePara){}
 	for i := 0; i < objType.NumMethod(); i++ {
 		valueMethod := objValue.Method(i)
+		if valueMethod.Type().PkgPath() != ""{
+			continue
+		}
 		typeMethod := objType.Method(i)
+		_,ok :=webApiMethodMap[typeMethod.Name]
+		if ok{ // method of  WebApi
+			continue
+		}
 		var in []reflect.Value
 		methodType := valueMethod.Type()
 		switch valueMethod.Type().NumIn() {
