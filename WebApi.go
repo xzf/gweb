@@ -43,6 +43,29 @@ func (api *WebApi) GetGoRequest() (req *http.Request, ok bool) {
 	req = ctx.request
 	return
 }
+func (api *WebApi) SetWriter(w http.ResponseWriter, req *http.Request) {
+	if api.id == ""{
+		api.id = "233"
+	}
+	api.httpCtxLock.Lock()
+	defer api.httpCtxLock.Unlock()
+	if api.httpCtxMap == nil {
+		api.httpCtxMap = map[string]*httpCtx{}
+	}
+	//todo test goroutine id can repeat
+	api.httpCtxMap[getGoroutineId()] = &httpCtx{
+		writer:  w,
+		request: req,
+	}
+}
+
+func(api *WebApi)SetKillFunc(f func()){
+	api.killFunc = f
+}
+
+func(api *WebApi)Kill(){
+	api.killFunc()
+}
 
 func (api *WebApi) getWriter() (w http.ResponseWriter, ok bool) {
 	api.httpCtxLock.Lock()
@@ -64,18 +87,3 @@ func (api *WebApi) getWriter() (w http.ResponseWriter, ok bool) {
 	return
 }
 
-func (api *WebApi) SetWriter(w http.ResponseWriter, req *http.Request) {
-	if api.id == ""{
-		api.id = "233"
-	}
-	api.httpCtxLock.Lock()
-	defer api.httpCtxLock.Unlock()
-	if api.httpCtxMap == nil {
-		api.httpCtxMap = map[string]*httpCtx{}
-	}
-	//todo test goroutine id can repeat
-	api.httpCtxMap[getGoroutineId()] = &httpCtx{
-		writer:  w,
-		request: req,
-	}
-}

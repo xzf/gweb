@@ -10,6 +10,9 @@ import (
 	"net/http"
 	"fmt"
 	"strings"
+	"os"
+	"os/signal"
+	"syscall"
 )
 
 //func NewHttpsServer(addr string, obj interface{}) {
@@ -43,16 +46,13 @@ func NewHttpServer(addr string, obj webApiInterface) {
 			//todo set 404 page
 			return
 		}
-		//need ptr for http.ResponseWriter
-		para:=httpRequestToPara(writer, request)
-		debugLog("95f6ga05w",string(para.Body))
-		method(para)
+		method(writer,request)
 	})
 	fmt.Println("http://127.0.0.1:2333")
 	http.ListenAndServe(addr, nil)
-	waitForKill()
-}
-
-func SetDebugMode() {
-	isDebug = true
+	ch := make(chan os.Signal)
+	obj.SetKillFunc(func() {
+		signal.Notify(ch, os.Interrupt, os.Kill, syscall.SIGTERM)
+		<-ch
+	})
 }

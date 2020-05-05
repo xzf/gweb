@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"runtime"
 	"strings"
+	"io/ioutil"
 )
 
 var logFunc func(string)
@@ -17,27 +18,26 @@ func debugLog(in ...interface{}) {
 		fmt.Println(in...)
 	}
 }
-func parseWebApiObj(obj interface{}) map[string]func(samplePara) {
-	//todo if obk not a ptr ,define a var to get ptr for obj
+func parseWebApiObj(obj interface{}) map[string]func(http.ResponseWriter, *http.Request) {
 	objType := reflect.TypeOf(obj)
 	objValue := reflect.ValueOf(obj)
 	debugLog("xv58t36dw num of method", objType.NumMethod())
-	methodMap := map[string]func(samplePara){}
+	methodMap := map[string]func(http.ResponseWriter, *http.Request){}
 	for i := 0; i < objType.NumMethod(); i++ {
 		valueMethod := objValue.Method(i)
-		if valueMethod.Type().PkgPath() != ""{
+		if valueMethod.Type().PkgPath() != "" {
 			continue
 		}
 		typeMethod := objType.Method(i)
-		_,ok :=webApiMethodMap[typeMethod.Name]
-		if ok{ // method of  WebApi
+		_, ok := webApiMethodMap[typeMethod.Name]
+		if ok { // method of  WebApi
 			continue
 		}
 		var in []reflect.Value
 		methodType := valueMethod.Type()
 		switch valueMethod.Type().NumIn() {
 		case 0:
-			methodMap[typeMethod.Name] = func(para samplePara) {
+			methodMap[typeMethod.Name] = func(http.ResponseWriter, *http.Request) {
 				valueMethod.Call(in)
 			}
 			continue
@@ -62,78 +62,42 @@ func parseWebApiObj(obj interface{}) map[string]func(samplePara) {
 					structFlag = true
 				}
 			}
-			jsonApiFunc := func(code string, para samplePara) {
-				if len(para.Body) == 0 {
-					para.writer.WriteHeader(400)
-					//do not need header, or you can all json header check
-					logFunc(code + " need request json body [ " + typeMethod.Name + " ]")
-					return
-				}
-				newObjValue := reflect.New(inType).Elem()
-				newObjValuePtr := newObjValue.Addr().Interface()
-				err := json.Unmarshal(para.Body, newObjValuePtr)
-				//can be replace to a high qps json decoder
-				if err != nil {
-					para.writer.WriteHeader(400)
-					logFunc(code + " [ " + typeMethod.Name + " ] json Unmarshal error " + err.Error())
-					return
-				}
-				in = append(in, reflect.ValueOf(newObjValuePtr).Elem())
-				valueMethod.Call(in)
-				return
-			}
-			if structFlag {
-				//read from body, is body empty,return para error and code 400
-				methodMap[typeMethod.Name] = func(para samplePara) {
-					jsonApiFunc("e60c6nbnw", para)
-				}
-				continue
-			}
-			// on level struct
-			// also can set by json
-			methodMap[typeMethod.Name] = func(para samplePara) {
-				newObjValue := reflect.New(inType).Elem()
-				//newObjValuePtr := newObjValue.Addr().Interface()
-				setFlag := false
-				for i := 0; i < inType.NumField(); i++ {
-					field := inType.Field(i)
-					if field.PkgPath != "" {
+			newObjValue := reflect.New(inType).Elem()
+			formValueSetToInSlice := func(formMap map[string][]string) (success bool) {
+				in = []reflect.Value{}
+				for key, strValueSlice := range formMap {
+					if len(strValueSlice) == 0 {
 						continue
 					}
-					fieldType := inType.Field(i).Type
+					field, ok := inType.FieldByName(key)
+					if !ok {
+						continue
+					}
+					if field.PkgPath != "" { // none public field
+						continue
+					}
+					fieldType := field.Type
 					kind := fieldType.Kind()
-					//can continue
 					if kind != reflect.Array && kind != reflect.Slice {
+						if len(strValueSlice) != 1 {
+							debugLog("kdmfudu5m warning path : [" + typeMethod.Name + "] para's field  [" + field.Name + "] has more than one value [ " + strings.Join(strValueSlice, ",") + " ]")
+						}
 						var strValue string
-						if para.httpMethod == http.MethodGet {
-							strValue = para.QSingleMap[field.Name]
-							if strValue == "" {
-								strValue = para.PostSingleMap[field.Name]
-							}
-						}
-						if para.httpMethod == http.MethodPost {
-							strValue = para.PostSingleMap[field.Name]
-							if strValue == "" {
-								strValue = para.QSingleMap[field.Name]
-							}
-						}
-						if strValue == "" {
-							continue
-						}
+						strValue = strValueSlice[0]
 						getKindErrStr := func(code string) string {
 							return code + " " + kind.String() + " field [" + field.Name + "] value wrong [ " + strValue + " ]"
 						}
 						switch kind {
 						case reflect.String:
-							newObjValue.Field(i).SetString(strValue)
+							debugLog("4pd3r2k42",strValue,field.Name,field.Type,field.Index)
+							newObjValue.Field(field.Index[0]).SetString(strValue)
 						case reflect.Bool:
 							boolValue, err := strconv.ParseBool(strValue)
 							if err != nil {
-								para.writer.WriteHeader(400)
 								logFunc(getKindErrStr("hh53qwl08"))
 								return
 							}
-							newObjValue.Field(i).SetBool(boolValue)
+							newObjValue.Field(field.Index[0]).SetBool(boolValue)
 						case reflect.Float64, reflect.Float32:
 							fv := 64
 							if kind == reflect.Float32 {
@@ -141,79 +105,60 @@ func parseWebApiObj(obj interface{}) map[string]func(samplePara) {
 							}
 							floatValue, err := strconv.ParseFloat(strValue, fv)
 							if err != nil {
-								para.writer.WriteHeader(400)
 								logFunc(getKindErrStr("via1vh6ky"))
 								return
 							}
-							newObjValue.Field(i).SetFloat(floatValue)
+							newObjValue.Field(field.Index[0]).SetFloat(floatValue)
 						case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 							tmpIntValue, err := strconv.ParseInt(strValue, 10, 64)
 							if err != nil {
-								para.writer.WriteHeader(400)
 								logFunc(getKindErrStr("8914tszqn"))
 								return
 							}
-							newObjValue.Field(i).SetInt(tmpIntValue)
+							newObjValue.Field(field.Index[0]).SetInt(tmpIntValue)
 							//switch kind {
 							//	case reflect.Int:
-							//		newObjValue.Field(i).Set(reflect.ValueOf(int(tmpIntValue)))
+							//		newObjValue.Field(field.Index[0]).Set(reflect.ValueOf(int(tmpIntValue)))
 							//	case reflect.Int8:
-							//		newObjValue.Field(i).Set(reflect.ValueOf(int8(tmpIntValue)))
+							//		newObjValue.Field(field.Index[0]).Set(reflect.ValueOf(int8(tmpIntValue)))
 							//	case reflect.Int16:
-							//		newObjValue.Field(i).Set(reflect.ValueOf(int16(tmpIntValue)))
+							//		newObjValue.Field(field.Index[0]).Set(reflect.ValueOf(int16(tmpIntValue)))
 							//	case reflect.Int32:
-							//		newObjValue.Field(i).Set(reflect.ValueOf(int32(tmpIntValue)))
+							//		newObjValue.Field(field.Index[0]).Set(reflect.ValueOf(int32(tmpIntValue)))
 							//	case reflect.Int64:
-							//		newObjValue.Field(i).SetInt(tmpIntValue)
+							//		newObjValue.Field(field.Index[0]).SetInt(tmpIntValue)
 							//}
 						case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 							tmpUintValue, err := strconv.ParseUint(strValue, 10, 64)
 							if err != nil {
-								para.writer.WriteHeader(400)
 								logFunc(getKindErrStr("8914tszqn"))
 								return
 							}
-							newObjValue.Field(i).SetUint(tmpUintValue)
+							newObjValue.Field(field.Index[0]).SetUint(tmpUintValue)
 							//switch kind {
 							//	case reflect.Uint:
-							//		newObjValue.Field(i).Set(reflect.ValueOf(int(tmpUintValue)))
+							//		newObjValue.Field(field.Index[0]).Set(reflect.ValueOf(int(tmpUintValue)))
 							//	case reflect.Uint8:
-							//		newObjValue.Field(i).Set(reflect.ValueOf(int8(tmpUintValue)))
+							//		newObjValue.Field(field.Index[0]).Set(reflect.ValueOf(int8(tmpUintValue)))
 							//	case reflect.Uint16:
-							//		newObjValue.Field(i).Set(reflect.ValueOf(int16(tmpUintValue)))
+							//		newObjValue.Field(field.Index[0]).Set(reflect.ValueOf(int16(tmpUintValue)))
 							//	case reflect.Uint32:
-							//		newObjValue.Field(i).Set(reflect.ValueOf(int32(tmpUintValue)))
+							//		newObjValue.Field(field.Index[0]).Set(reflect.ValueOf(int32(tmpUintValue)))
 							//	case reflect.Uint64:
-							//		newObjValue.Field(i).SetUint(tmpUintValue)
+							//		newObjValue.Field(field.Index[0]).SetUint(tmpUintValue)
 							//}
 						}
-						setFlag = true
 						continue
 					}
-					var strValueSlice []string
-					if para.httpMethod == http.MethodGet {
-						strValueSlice = para.QMultiMap[field.Name]
-						if len(strValueSlice) == 0 {
-							strValueSlice = para.PostMultiMap[field.Name]
-						}
-					}
-					if para.httpMethod == http.MethodPost {
-						strValueSlice = para.PostMultiMap[field.Name]
-						if len(strValueSlice) == 0 {
-							strValueSlice = para.QMultiMap[field.Name]
-						}
-					}
-					if len(strValueSlice) == 0 {
-						continue
-					}
+					//slice and array
 					isSlice := kind == reflect.Slice
 					switch fieldType.Elem().Kind() {
 					case reflect.String:
 						if isSlice {
-							newObjValue.Field(i).Set(reflect.ValueOf(strValueSlice))
+							newObjValue.Field(field.Index[0]).Set(reflect.ValueOf(strValueSlice))
 						} else {
 							for index, oneStrValue := range strValueSlice {
-								newObjValue.Field(i).Index(index).SetString(oneStrValue)
+								newObjValue.Field(field.Index[0]).Index(index).SetString(oneStrValue)
 							}
 						}
 					case reflect.Bool:
@@ -224,18 +169,17 @@ func parseWebApiObj(obj interface{}) map[string]func(samplePara) {
 						for index, oneStrValue := range strValueSlice {
 							boolValue, err := strconv.ParseBool(oneStrValue)
 							if err != nil {
-								para.writer.WriteHeader(400)
 								logFunc("lewqa17bi" + " " + kind.String() + " field [" + field.Name + "] one value wrong [ " + oneStrValue + " ]")
 								return
 							}
 							if isSlice {
 								boolSlice = append(boolSlice, boolValue)
 							} else {
-								newObjValue.Field(i).Index(index).SetBool(boolValue)
+								newObjValue.Field(field.Index[0]).Index(index).SetBool(boolValue)
 							}
 						}
 						if isSlice {
-							newObjValue.Field(i).Set(reflect.ValueOf(boolSlice))
+							newObjValue.Field(field.Index[0]).Set(reflect.ValueOf(boolSlice))
 						}
 					case reflect.Float64:
 						var float64Slice []float64
@@ -245,18 +189,17 @@ func parseWebApiObj(obj interface{}) map[string]func(samplePara) {
 						for index, oneStrValue := range strValueSlice {
 							float64Value, err := strconv.ParseFloat(oneStrValue, 64)
 							if err != nil {
-								para.writer.WriteHeader(400)
 								logFunc("ssex5xsb7" + " " + kind.String() + " field [" + field.Name + "] one value wrong [ " + oneStrValue + " ]")
 								return
 							}
 							if isSlice {
 								float64Slice = append(float64Slice, float64Value)
 							} else {
-								newObjValue.Field(i).Index(index).SetFloat(float64Value)
+								newObjValue.Field(field.Index[0]).Index(index).SetFloat(float64Value)
 							}
 						}
 						if isSlice {
-							newObjValue.Field(i).Set(reflect.ValueOf(float64Slice))
+							newObjValue.Field(field.Index[0]).Set(reflect.ValueOf(float64Slice))
 						}
 					case reflect.Float32:
 						var float32Slice []float32
@@ -266,18 +209,17 @@ func parseWebApiObj(obj interface{}) map[string]func(samplePara) {
 						for index, oneStrValue := range strValueSlice {
 							float32Value, err := strconv.ParseFloat(oneStrValue, 32)
 							if err != nil {
-								para.writer.WriteHeader(400)
 								logFunc("boydstipm" + " " + kind.String() + " field [" + field.Name + "] one value wrong [ " + oneStrValue + " ]")
 								return
 							}
 							if isSlice {
 								float32Slice = append(float32Slice, float32(float32Value))
 							} else {
-								newObjValue.Field(i).Index(index).SetFloat(float32Value)
+								newObjValue.Field(field.Index[0]).Index(index).SetFloat(float32Value)
 							}
 						}
 						if isSlice {
-							newObjValue.Field(i).Set(reflect.ValueOf(float32Slice))
+							newObjValue.Field(field.Index[0]).Set(reflect.ValueOf(float32Slice))
 						}
 					case reflect.Int:
 						var intSlice []int
@@ -287,18 +229,17 @@ func parseWebApiObj(obj interface{}) map[string]func(samplePara) {
 						for index, oneStrValue := range strValueSlice {
 							int64Value, err := strconv.ParseInt(oneStrValue, 10, 64)
 							if err != nil {
-								para.writer.WriteHeader(400)
 								logFunc("xsd96lzpo" + " " + kind.String() + " field [" + field.Name + "] one value wrong [ " + oneStrValue + " ]")
 								return
 							}
 							if isSlice {
 								intSlice = append(intSlice, int(int64Value))
 							} else {
-								newObjValue.Field(i).Index(index).SetInt(int64Value)
+								newObjValue.Field(field.Index[0]).Index(index).SetInt(int64Value)
 							}
 						}
 						if isSlice {
-							newObjValue.Field(i).Set(reflect.ValueOf(intSlice))
+							newObjValue.Field(field.Index[0]).Set(reflect.ValueOf(intSlice))
 						}
 					case reflect.Int8:
 						var int8Slice []int8
@@ -308,18 +249,17 @@ func parseWebApiObj(obj interface{}) map[string]func(samplePara) {
 						for index, oneStrValue := range strValueSlice {
 							int64Value, err := strconv.ParseInt(oneStrValue, 10, 64)
 							if err != nil {
-								para.writer.WriteHeader(400)
 								logFunc("v8jd6ehdu" + " " + kind.String() + " field [" + field.Name + "] one value wrong [ " + oneStrValue + " ]")
 								return
 							}
 							if isSlice {
 								int8Slice = append(int8Slice, int8(int64Value))
 							} else {
-								newObjValue.Field(i).Index(index).SetInt(int64Value)
+								newObjValue.Field(field.Index[0]).Index(index).SetInt(int64Value)
 							}
 						}
 						if isSlice {
-							newObjValue.Field(i).Set(reflect.ValueOf(int8Slice))
+							newObjValue.Field(field.Index[0]).Set(reflect.ValueOf(int8Slice))
 						}
 					case reflect.Int16:
 						var int16Slice []int16
@@ -329,18 +269,17 @@ func parseWebApiObj(obj interface{}) map[string]func(samplePara) {
 						for index, oneStrValue := range strValueSlice {
 							int64Value, err := strconv.ParseInt(oneStrValue, 10, 64)
 							if err != nil {
-								para.writer.WriteHeader(400)
 								logFunc("v6962e3rf" + " " + kind.String() + " field [" + field.Name + "] one value wrong [ " + oneStrValue + " ]")
 								return
 							}
 							if isSlice {
 								int16Slice = append(int16Slice, int16(int64Value))
 							} else {
-								newObjValue.Field(i).Index(index).SetInt(int64Value)
+								newObjValue.Field(field.Index[0]).Index(index).SetInt(int64Value)
 							}
 						}
 						if isSlice {
-							newObjValue.Field(i).Set(reflect.ValueOf(int16Slice))
+							newObjValue.Field(field.Index[0]).Set(reflect.ValueOf(int16Slice))
 						}
 					case reflect.Int32:
 						var int32Slice []int32
@@ -350,18 +289,17 @@ func parseWebApiObj(obj interface{}) map[string]func(samplePara) {
 						for index, oneStrValue := range strValueSlice {
 							int64Value, err := strconv.ParseInt(oneStrValue, 10, 64)
 							if err != nil {
-								para.writer.WriteHeader(400)
 								logFunc("z2uqrori7" + " " + kind.String() + " field [" + field.Name + "] one value wrong [ " + oneStrValue + " ]")
 								return
 							}
 							if isSlice {
 								int32Slice = append(int32Slice, int32(int64Value))
 							} else {
-								newObjValue.Field(i).Index(index).SetInt(int64Value)
+								newObjValue.Field(field.Index[0]).Index(index).SetInt(int64Value)
 							}
 						}
 						if isSlice {
-							newObjValue.Field(i).Set(reflect.ValueOf(int32Slice))
+							newObjValue.Field(field.Index[0]).Set(reflect.ValueOf(int32Slice))
 						}
 					case reflect.Int64:
 						var int64Slice []int64
@@ -371,18 +309,17 @@ func parseWebApiObj(obj interface{}) map[string]func(samplePara) {
 						for index, oneStrValue := range strValueSlice {
 							int64Value, err := strconv.ParseInt(oneStrValue, 10, 64)
 							if err != nil {
-								para.writer.WriteHeader(400)
 								logFunc("np7sytoo8" + " " + kind.String() + " field [" + field.Name + "] one value wrong [ " + oneStrValue + " ]")
 								return
 							}
 							if isSlice {
 								int64Slice = append(int64Slice, int64Value)
 							} else {
-								newObjValue.Field(i).Index(index).SetInt(int64Value)
+								newObjValue.Field(field.Index[0]).Index(index).SetInt(int64Value)
 							}
 						}
 						if isSlice {
-							newObjValue.Field(i).Set(reflect.ValueOf(int64Slice))
+							newObjValue.Field(field.Index[0]).Set(reflect.ValueOf(int64Slice))
 						}
 					case reflect.Uint:
 						var uintSlice []uint
@@ -392,18 +329,17 @@ func parseWebApiObj(obj interface{}) map[string]func(samplePara) {
 						for index, oneStrValue := range strValueSlice {
 							uint64Value, err := strconv.ParseUint(oneStrValue, 10, 64)
 							if err != nil {
-								para.writer.WriteHeader(400)
 								logFunc("9ud8qgwdg" + " " + kind.String() + " field [" + field.Name + "] one value wrong [ " + oneStrValue + " ]")
 								return
 							}
 							if isSlice {
 								uintSlice = append(uintSlice, uint(uint64Value))
 							} else {
-								newObjValue.Field(i).Index(index).SetUint(uint64Value)
+								newObjValue.Field(field.Index[0]).Index(index).SetUint(uint64Value)
 							}
 						}
 						if isSlice {
-							newObjValue.Field(i).Set(reflect.ValueOf(uintSlice))
+							newObjValue.Field(field.Index[0]).Set(reflect.ValueOf(uintSlice))
 						}
 					case reflect.Uint8:
 						var uint8Slice []uint8
@@ -413,18 +349,17 @@ func parseWebApiObj(obj interface{}) map[string]func(samplePara) {
 						for index, oneStrValue := range strValueSlice {
 							uint64Value, err := strconv.ParseUint(oneStrValue, 10, 64)
 							if err != nil {
-								para.writer.WriteHeader(400)
 								logFunc("tzmn1urh9" + " " + kind.String() + " field [" + field.Name + "] one value wrong [ " + oneStrValue + " ]")
 								return
 							}
 							if isSlice {
 								uint8Slice = append(uint8Slice, uint8(uint64Value))
 							} else {
-								newObjValue.Field(i).Index(index).SetUint(uint64Value)
+								newObjValue.Field(field.Index[0]).Index(index).SetUint(uint64Value)
 							}
 						}
 						if isSlice {
-							newObjValue.Field(i).Set(reflect.ValueOf(uint8Slice))
+							newObjValue.Field(field.Index[0]).Set(reflect.ValueOf(uint8Slice))
 						}
 					case reflect.Uint16:
 						var uint16Slice []uint16
@@ -434,18 +369,17 @@ func parseWebApiObj(obj interface{}) map[string]func(samplePara) {
 						for index, oneStrValue := range strValueSlice {
 							uint64Value, err := strconv.ParseUint(oneStrValue, 10, 64)
 							if err != nil {
-								para.writer.WriteHeader(400)
 								logFunc("i2wwwykyz" + " " + kind.String() + " field [" + field.Name + "] one value wrong [ " + oneStrValue + " ]")
 								return
 							}
 							if isSlice {
 								uint16Slice = append(uint16Slice, uint16(uint64Value))
 							} else {
-								newObjValue.Field(i).Index(index).SetUint(uint64Value)
+								newObjValue.Field(field.Index[0]).Index(index).SetUint(uint64Value)
 							}
 						}
 						if isSlice {
-							newObjValue.Field(i).Set(reflect.ValueOf(uint16Slice))
+							newObjValue.Field(field.Index[0]).Set(reflect.ValueOf(uint16Slice))
 						}
 					case reflect.Uint32:
 						var uint32Slice []uint32
@@ -455,18 +389,17 @@ func parseWebApiObj(obj interface{}) map[string]func(samplePara) {
 						for index, oneStrValue := range strValueSlice {
 							uint64Value, err := strconv.ParseUint(oneStrValue, 10, 64)
 							if err != nil {
-								para.writer.WriteHeader(400)
 								logFunc("4320zcfy6" + " " + kind.String() + " field [" + field.Name + "] one value wrong [ " + oneStrValue + " ]")
 								return
 							}
 							if isSlice {
 								uint32Slice = append(uint32Slice, uint32(uint64Value))
 							} else {
-								newObjValue.Field(i).Index(index).SetUint(uint64Value)
+								newObjValue.Field(field.Index[0]).Index(index).SetUint(uint64Value)
 							}
 						}
 						if isSlice {
-							newObjValue.Field(i).Set(reflect.ValueOf(uint32Slice))
+							newObjValue.Field(field.Index[0]).Set(reflect.ValueOf(uint32Slice))
 						}
 					case reflect.Uint64:
 						var uint64Slice []uint64
@@ -476,26 +409,96 @@ func parseWebApiObj(obj interface{}) map[string]func(samplePara) {
 						for index, oneStrValue := range strValueSlice {
 							uint64Value, err := strconv.ParseUint(oneStrValue, 10, 64)
 							if err != nil {
-								para.writer.WriteHeader(400)
 								logFunc("uuz5pmohk" + " " + kind.String() + " field [" + field.Name + "] one value wrong [ " + oneStrValue + " ]")
 								return
 							}
 							if isSlice {
 								uint64Slice = append(uint64Slice, uint64Value)
 							} else {
-								newObjValue.Field(i).Index(index).SetUint(uint64Value)
+								newObjValue.Field(field.Index[0]).Index(index).SetUint(uint64Value)
 							}
 						}
 						if isSlice {
-							newObjValue.Field(i).Set(reflect.ValueOf(uint64Slice))
+							newObjValue.Field(field.Index[0]).Set(reflect.ValueOf(uint64Slice))
 						}
 					}
-					setFlag = true
 				}
-				if !setFlag {
-					jsonApiFunc("i4wqyxplp", para)
-				}
+				newObjValuePtr := newObjValue.Addr().Interface()
+				in = append(in, reflect.ValueOf(newObjValuePtr).Elem())
+				success = true
 				return
+			}
+			methodMap[typeMethod.Name] = func(writer http.ResponseWriter, request *http.Request) {
+				contentType := request.Header.Get("Content-Type")
+				switch {
+				case contentType == "application/json":
+					in = []reflect.Value{}
+					body, err := ioutil.ReadAll(request.Body)
+					if err != nil {
+						logFunc("u5suypqlv request body read error : " + err.Error())
+						writer.WriteHeader(400) //bad request
+						return
+					}
+					newObjValuePtr := newObjValue.Addr().Interface()
+					err = json.Unmarshal(body, newObjValuePtr)
+					//can be replace to a high qps json decoder
+					if err != nil {
+						writer.WriteHeader(400)
+						logFunc("fgl7vg91q [ " + typeMethod.Name + " ] json Unmarshal error " + err.Error())
+						return
+					}
+					in = append(in, reflect.ValueOf(newObjValuePtr).Elem())
+					valueMethod.Call(in)
+					return
+				//has todo
+				case strings.HasPrefix(contentType, "multipart/form-data"):
+					if structFlag {
+						debugLog("zzjvz6l3y warning path : [" + typeMethod.Name + "] para has unsupport struct field,if set it's value will return  bad request(http code 400)")
+					}
+					err := request.ParseMultipartForm(4096) //todo need user define
+					if err != nil {
+						logFunc("2ag9oo1lt request ParseMultipartForm error : " + err.Error())
+						writer.WriteHeader(400) //bad request
+						return
+					}
+					ok := formValueSetToInSlice(request.MultipartForm.Value)
+					if !ok {
+						writer.WriteHeader(400) //bad request
+						return
+					}
+					valueMethod.Call(in)
+				//has todo
+				//and para field can not be struct
+				case contentType == "application/x-www-form-urlencoded":
+					if structFlag {
+						debugLog("zzjvz6l3y warning path : [" + typeMethod.Name + "] para has unsupport struct field,if set it's value will return  bad request(http code 400)")
+					}
+					if request.Method == http.MethodPost {
+						err := request.ParseForm()
+						if err != nil {
+							logFunc("11tp4qrno request ParseForm error : " + err.Error())
+							writer.WriteHeader(400) //bad request
+							return
+						}
+						ok := formValueSetToInSlice(request.Form)
+						if !ok {
+							writer.WriteHeader(400) //bad request
+							return
+						}
+						debugLog("puyk0y72b", len(in),in)
+						valueMethod.Call(in)
+						return
+					}
+					//todo get  need to parse body
+					writer.WriteHeader(400) //bad request
+					logFunc("4alafpbfr request header content type is [ application/x-www-form-urlencoded ] but http method is get, can not parse form")
+					return
+				default:
+					logFunc("sfqn3u5to ContentType [ " + contentType + " ] wrong")
+					writer.WriteHeader(400) //bad request
+					return
+				}
+				valueMethod.Call(in)
 			}
 		default:
 			logInfo := "jsd4cq0w2 do not support multi para"
@@ -508,20 +511,9 @@ func parseWebApiObj(obj interface{}) map[string]func(samplePara) {
 	return methodMap
 }
 
-func (para samplePara) GetOneString(method string) {
-	if method == http.MethodGet {
-		if len(para.QMultiMap) != 0 {
-
-			return
-		}
-		return
-	}
-}
-
 //unsupport type :Func,Interface,byte、complex、chan、ptr and their slice type
 var unSupportKindSlice = []reflect.Kind{ //todo maybe map faster
 	reflect.Chan,
-	//reflect.Slice, //todo check item type
 	reflect.Ptr,
 	reflect.Complex64,
 	reflect.Complex64,
@@ -549,37 +541,6 @@ func unsupportKindPanic(kind reflect.Kind) {
 	}
 	panic(str)
 }
-
-/*
-for i := 0; i < methodNum; i++ {
-		methodName := objType.Method(i).Name
-		//method := objValue.Method(i)
-		//for ii:=0;i<objType.NumIn();ii++{
-		//	inType:=objType.In(ii)
-		//}
-		//para := reflect.New(inPara).Type()
-		//logFunc(methodName, " | ", method.Type.In(1))
-
-		methodMap[methodName] = func(para samplePara) {
-			//reflect.New(objType)
-			//method.Call([]reflect.Value{})
-		}
-		//logFunc(objType.Method(i).Type.NumIn())
-		//inPara := objType.Method(i).Type.In(1)
-		//for j := 0; j < inPara.NumField(); j++ {
-		//	logFunc(methodName, inPara.Name(), inPara.Field(j).Name, inPara.Field(j).Type)
-		//}
-		//remove  methods for WebApi
-		//if methodName == "" {
-		//	continue
-		//}
-		//method := objValue.Method(i)
-
-		//logFunc(objValue.Method(i).String())
-	}
-*/
-
-
 
 func getGoroutineId() string {
 	var buf [128]byte

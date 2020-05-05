@@ -8,29 +8,14 @@ package gweb
 
 import (
 	"net/http"
-	"os"
-	"os/signal"
-	"syscall"
 	"sync"
 )
 
-type samplePara struct {
-	QSingleMap map[string]string
-	QMultiMap map[string][]string
-	PostSingleMap map[string]string
-	PostMultiMap map[string][]string
-	Body []byte
-	IsBodyJson bool
-	originRequest *http.Request
-	writer http.ResponseWriter
-	httpMethod string
-}
-
 type WebApi struct {
 	id string
-	methodMap map[string]func(samplePara)
 	httpCtxMap map[string]*httpCtx
 	httpCtxLock sync.Mutex
+	killFunc func()
 }
 
 type httpCtx struct {
@@ -42,11 +27,8 @@ type webApiInterface interface {
 	WriteBody(body []byte) (ok bool)
 	GetGoRequest() (req *http.Request, ok bool)
 	SetWriter(w http.ResponseWriter, req *http.Request)
+	SetKillFunc(func())
+	Kill()
 }
 
-func waitForKill() {
-	ch := make(chan os.Signal)
-	signal.Notify(ch, os.Interrupt, os.Kill, syscall.SIGTERM)
-	<-ch
-}
 

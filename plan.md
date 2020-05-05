@@ -47,3 +47,4 @@ func(a WebApi)WriteBody(str string){// no must to be string para
 todo 
 file upload 
 file handler
+https 
