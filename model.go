@@ -9,6 +9,7 @@ package gweb
 import (
 	"net/http"
 	"sync"
+	"os"
 )
 
 type WebApi struct {
@@ -16,6 +17,7 @@ type WebApi struct {
 	httpCtxMap map[string]*httpCtx
 	httpCtxLock sync.Mutex
 	killFunc func()
+	closeChan chan os.Signal
 }
 
 type httpCtx struct {

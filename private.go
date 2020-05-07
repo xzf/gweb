@@ -431,7 +431,7 @@ func parseWebApiObj(obj interface{}) map[string]func(http.ResponseWriter, *http.
 			methodMap[typeMethod.Name] = func(writer http.ResponseWriter, request *http.Request) {
 				contentType := request.Header.Get("Content-Type")
 				switch {
-				case contentType == "application/json":
+				case strings.HasPrefix(contentType, "application/json"):
 					in = []reflect.Value{}
 					body, err := ioutil.ReadAll(request.Body)
 					if err != nil {
@@ -469,7 +469,7 @@ func parseWebApiObj(obj interface{}) map[string]func(http.ResponseWriter, *http.
 					valueMethod.Call(in)
 				//has todo
 				//and para field can not be struct
-				case contentType == "application/x-www-form-urlencoded":
+				case strings.HasPrefix(contentType, "application/x-www-form-urlencoded"):
 					if structFlag {
 						debugLog("zzjvz6l3y warning path : [" + typeMethod.Name + "] para has unsupport struct field,if set it's value will return  bad request(http code 400)")
 					}

@@ -28,7 +28,8 @@ func NewHttpServer(addr string, obj webApiInterface) {
 	}
 	methodMap := parseWebApiObj(obj)
 	debugLog("9bb8941zd api map count:", len(methodMap),methodMap)
-	http.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
 		//http method not important,just support get and post
 		//post api call by get won't get 500, but para value might set wrong
 		if http.MethodGet != request.Method && http.MethodPost != request.Method {
@@ -49,10 +50,12 @@ func NewHttpServer(addr string, obj webApiInterface) {
 		method(writer,request)
 	})
 	fmt.Println("http://127.0.0.1:2333")
-	http.ListenAndServe(addr, nil)
+	go http.ListenAndServe(addr, mux)
 	ch := make(chan os.Signal)
 	obj.SetKillFunc(func() {
-		signal.Notify(ch, os.Interrupt, os.Kill, syscall.SIGTERM)
-		<-ch
+		ch <- os.Kill
+		logFunc("tk7khmjfwn normal kill")
 	})
+	signal.Notify(ch, os.Interrupt, os.Kill, syscall.SIGTERM)
+	<-ch
 }

@@ -11,9 +11,11 @@ import (
 )
 
 var webApiMethodMap = map[string]struct{}{
-	"WriteBody":{},
-	"GetGoRequest":{},
-	"SetWriter":{},
+	"WriteBody":    {},
+	"GetGoRequest": {},
+	"SetWriter":    {},
+	"SetKillFunc":  {},
+	"Kill":         {},
 }
 
 func (api *WebApi) WriteBody(body []byte) (ok bool) {
@@ -43,8 +45,9 @@ func (api *WebApi) GetGoRequest() (req *http.Request, ok bool) {
 	req = ctx.request
 	return
 }
+
 func (api *WebApi) SetWriter(w http.ResponseWriter, req *http.Request) {
-	if api.id == ""{
+	if api.id == "" {
 		api.id = "233"
 	}
 	api.httpCtxLock.Lock()
@@ -59,12 +62,14 @@ func (api *WebApi) SetWriter(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func(api *WebApi)SetKillFunc(f func()){
+func (api *WebApi) SetKillFunc(f func()) {
 	api.killFunc = f
 }
 
-func(api *WebApi)Kill(){
-	api.killFunc()
+func (api *WebApi) Kill() {
+	if api.killFunc != nil{
+		api.killFunc()
+	}
 }
 
 func (api *WebApi) getWriter() (w http.ResponseWriter, ok bool) {
@@ -86,4 +91,3 @@ func (api *WebApi) getWriter() (w http.ResponseWriter, ok bool) {
 	w = ctx.writer
 	return
 }
-
