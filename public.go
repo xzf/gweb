@@ -9,53 +9,71 @@ package gweb
 import (
 	"net/http"
 	"fmt"
-	"strings"
 	"os"
 	"os/signal"
 	"syscall"
+	"strings"
 )
 
-//func NewHttpsServer(addr string, obj interface{}) {
-//	//todo tls config, I think this thing just need call a check tls func before call http method, study this later.
-//	//ParseWebApiObj(obj)
-//}
+type NewHttpRequest struct {
+	Addr           string
+	Obj            webApiInterface
+	Prefix         string
+	FileRootPath   string //can be empty
+	FilePathPrefix string //can be empty
+	Crt            string //if empty and Key also empty mean http server
+	Key            string //if empty and Crt also empty mean http server
+}
 
-func NewHttpServer(addr string, obj webApiInterface) {
+func NewHttpServer(req NewHttpRequest) {
 	if logFunc == nil {
 		logFunc = func(logStr string) {
 			fmt.Println(logStr)
 		}
 	}
-	methodMap := parseWebApiObj(obj)
-	debugLog("9bb8941zd api map count:", len(methodMap),methodMap)
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
-		//http method not important,just support get and post
-		//post api call by get won't get 500, but para value might set wrong
-		if http.MethodGet != request.Method && http.MethodPost != request.Method {
-			writer.WriteHeader(404)
-			return
+	methodMap := parseWebApiObjToMethodMap(req.Obj)
+	debugLog("9bb8941zd api map count:", len(methodMap), methodMap)
+	for path, logicFunc := range methodMap {
+		apiPath := "/" + path
+		if req.Prefix != "" {
+			apiPath = "/" + req.Prefix + "/" + path
 		}
-		path := strings.Trim(request.URL.Path,"/")
-		obj.SetWriter(writer,request) //interface call
-		debugLog("o09lp1lc4 HandleFunc id",getGoroutineId())
-		debugLog("9bb8941zd call api:", path)
-		method, ok := methodMap[strings.Trim(path,"/")]
-		if !ok {
-			debugLog("9bb8941zd call api 404", path)
-			writer.WriteHeader(404)
-			//todo set 404 page
-			return
-		}
-		method(writer,request)
-	})
-	fmt.Println("http://127.0.0.1:2333")
-	go http.ListenAndServe(addr, mux)
+		mux.HandleFunc(apiPath, func(writer http.ResponseWriter, request *http.Request) {
+			//http method not important,just support get and post
+			//post api call by get won't get 500, but para value might set wrong
+			if http.MethodGet != request.Method && http.MethodPost != request.Method {
+				writer.WriteHeader(404)
+				return
+			}
+			path := strings.Trim(request.URL.Path, "/")
+			req.Obj.SetWriter(writer, request) //interface call
+			debugLog("o09lp1lc4 HandleFunc id", getGoroutineId())
+			debugLog("9bb8941zd call api:", path)
+			logicFunc(writer, request)
+		})
+	}
+	if req.FileRootPath != "" && req.FilePathPrefix != "" {
+		mux.HandleFunc("/"+req.FilePathPrefix+"/", func(writer http.ResponseWriter, request *http.Request) {
+			//todo file handler
+			fmt.Println("file ", request.URL.Path)
+		})
+	}
+	if req.Crt == "" && req.Key == "" {
+		go http.ListenAndServe(req.Addr, mux)
+		fmt.Println("start http server success")
+		return
+	}
+	if req.Crt != "" && req.Key != "" {
+		go http.ListenAndServeTLS(req.Addr, req.Crt, req.Key, mux)
+		fmt.Println("start https server success")
+		return
+	}
+	panic("Crt and Key must be both empty or both not empty")
+}
+
+func WaitForKill() {
 	ch := make(chan os.Signal)
-	obj.SetKillFunc(func() {
-		ch <- os.Kill
-		logFunc("tk7khmjfwn normal kill")
-	})
 	signal.Notify(ch, os.Interrupt, os.Kill, syscall.SIGTERM)
 	<-ch
 }

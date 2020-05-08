@@ -29,8 +29,6 @@ type webApiInterface interface {
 	WriteBody(body []byte) (ok bool)
 	GetGoRequest() (req *http.Request, ok bool)
 	SetWriter(w http.ResponseWriter, req *http.Request)
-	SetKillFunc(func())
-	Kill()
 }
 
 

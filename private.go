@@ -18,7 +18,8 @@ func debugLog(in ...interface{}) {
 		fmt.Println(in...)
 	}
 }
-func parseWebApiObj(obj interface{}) map[string]func(http.ResponseWriter, *http.Request) {
+
+func parseWebApiObjToMethodMap(obj interface{}) map[string]func(http.ResponseWriter, *http.Request) {
 	objType := reflect.TypeOf(obj)
 	objValue := reflect.ValueOf(obj)
 	debugLog("xv58t36dw num of method", objType.NumMethod())

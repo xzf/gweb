@@ -14,8 +14,6 @@ var webApiMethodMap = map[string]struct{}{
 	"WriteBody":    {},
 	"GetGoRequest": {},
 	"SetWriter":    {},
-	"SetKillFunc":  {},
-	"Kill":         {},
 }
 
 func (api *WebApi) WriteBody(body []byte) (ok bool) {
@@ -59,16 +57,6 @@ func (api *WebApi) SetWriter(w http.ResponseWriter, req *http.Request) {
 	api.httpCtxMap[getGoroutineId()] = &httpCtx{
 		writer:  w,
 		request: req,
-	}
-}
-
-func (api *WebApi) SetKillFunc(f func()) {
-	api.killFunc = f
-}
-
-func (api *WebApi) Kill() {
-	if api.killFunc != nil{
-		api.killFunc()
 	}
 }
 
