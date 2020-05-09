@@ -40,23 +40,23 @@ func NewHttpServer(req NewHttpRequest) {
 		//http method not important,just support get and post
 		//post api call by get won't get 500, but para value might set wrong
 		if http.MethodGet != request.Method && http.MethodPost != request.Method {
-			debugLog("pnj27n9nf call api "+request.Method)
+			debugLog("pnj27n9nf call api " + request.Method)
 			writer.WriteHeader(404)
 			return
 		}
-		path := strings.Trim(request.URL.Path,"/")
-		debugLog("pnj27n9nf call api "+path)
-		req.Obj.SetWriter(writer,request) //interface call
-		debugLog("o09lp1lc4 HandleFunc id",getGoroutineId())
+		path := strings.Trim(request.URL.Path, "/")
+		debugLog("pnj27n9nf call api " + path)
+		req.Obj.SetWriter(writer, request) //interface call
+		debugLog("o09lp1lc4 HandleFunc id", getGoroutineId())
 		debugLog("9bb8941zd call api:", path)
-		method, ok := methodMap[strings.Trim(path,"/")]
+		method, ok := methodMap[strings.Trim(path, "/")]
 		if !ok {
 			debugLog("9bb8941zd call api 404", path)
 			writer.WriteHeader(404)
 			//todo set 404 page
 			return
 		}
-		method(writer,request)
+		method(writer, request)
 	})
 	if req.FileRootPath != "" && req.FilePathPrefix != "" {
 		filePathPrefix := "/" + req.FilePathPrefix + "/"
@@ -92,8 +92,8 @@ func NewHttpServer(req NewHttpRequest) {
 	if req.Crt == "" && req.Key == "" {
 		go func() {
 			err := http.ListenAndServe(req.Addr, mux)
-			if err!=nil{
-				logFunc("zw2otslp6 ListenAndServe failed error : "+err.Error())
+			if err != nil {
+				logFunc("zw2otslp6 ListenAndServe failed error : " + err.Error())
 				return
 			}
 			fmt.Println("start http server success")
@@ -103,8 +103,8 @@ func NewHttpServer(req NewHttpRequest) {
 	if req.Crt != "" && req.Key != "" {
 		go func() {
 			err := http.ListenAndServeTLS(req.Addr, req.Crt, req.Key, mux)
-			if err!=nil{
-				logFunc("zw2otslp6 ListenAndServe failed error : "+err.Error())
+			if err != nil {
+				logFunc("zw2otslp6 ListenAndServe failed error : " + err.Error())
 				return
 			}
 			fmt.Println("start http server success")

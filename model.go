@@ -31,4 +31,8 @@ type webApiInterface interface {
 	SetWriter(w http.ResponseWriter, req *http.Request)
 }
 
+type fileInfo struct {
+	Content  []byte
+	FileName string
+}
 

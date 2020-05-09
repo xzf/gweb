@@ -8,6 +8,7 @@ package gweb
 
 import (
 	"net/http"
+	"io/ioutil"
 )
 
 var webApiMethodMap = map[string]struct{}{
@@ -77,5 +78,34 @@ func (api *WebApi) getWriter() (w http.ResponseWriter, ok bool) {
 		return
 	}
 	w = ctx.writer
+	return
+}
+
+func (api *WebApi) GetFileSlice() (fileSlice []fileInfo) {
+	req, ok := api.GetGoRequest()
+	if !ok {
+		logFunc("sjw6f4qbm can't get http.Request")
+		return
+	}
+	debugLog("u7z5h5z74",req.MultipartForm)
+	debugLog("tz3lrxdnh",req.MultipartForm.File)
+	for _, fhSlice := range req.MultipartForm.File {
+		for _, fh := range fhSlice {
+			f, err := fh.Open()
+			if err != nil {
+				logFunc("wos0ysbkb file open err : " + err.Error())
+				return
+			}
+			content, err := ioutil.ReadAll(f)
+			if err != nil {
+				logFunc("gsvffvedz file read err : " + err.Error())
+				return
+			}
+			fileSlice = append(fileSlice, fileInfo{
+				Content:  content,
+				FileName: fh.Filename,
+			})
+		}
+	}
 	return
 }

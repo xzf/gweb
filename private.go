@@ -34,12 +34,33 @@ func parseWebApiObjToMethodMap(obj interface{}) map[string]func(http.ResponseWri
 		if ok { // method of  WebApi
 			continue
 		}
-		var in []reflect.Value
 		methodType := valueMethod.Type()
 		switch valueMethod.Type().NumIn() {
 		case 0:
-			methodMap[typeMethod.Name] = func(http.ResponseWriter, *http.Request) {
-				valueMethod.Call(in)
+			methodMap[typeMethod.Name] = func(writer http.ResponseWriter, request *http.Request) {
+				contentType := request.Header.Get("Content-Type")
+				switch {
+				case strings.HasPrefix(contentType, "application/json"):
+				case strings.HasPrefix(contentType, "multipart/form-data"):
+					err := request.ParseMultipartForm(4096) //todo need user define
+					if err != nil {
+						logFunc("d60nmqk5v request ParseMultipartForm error : " + err.Error())
+						writer.WriteHeader(400) //bad request
+						return
+					}
+				case strings.HasPrefix(contentType, "application/x-www-form-urlencoded"):
+					err := request.ParseForm() //todo need user define
+					if err != nil {
+						logFunc("q19f5pvyf request ParseForm error : " + err.Error())
+						writer.WriteHeader(400) //bad request
+						return
+					}
+				default:
+					logFunc("sfqn3u5to ContentType [ " + contentType + " ] wrong")
+					writer.WriteHeader(400) //bad request
+					return
+				}
+				valueMethod.Call(nil)
 			}
 			continue
 		case 1:
@@ -65,7 +86,6 @@ func parseWebApiObjToMethodMap(obj interface{}) map[string]func(http.ResponseWri
 			}
 			newObjValue := reflect.New(inType).Elem()
 			formValueSetToInSlice := func(formMap map[string][]string) (success bool) {
-				in = []reflect.Value{}
 				for key, strValueSlice := range formMap {
 					if len(strValueSlice) == 0 {
 						continue
@@ -90,9 +110,9 @@ func parseWebApiObjToMethodMap(obj interface{}) map[string]func(http.ResponseWri
 						}
 						switch kind {
 						case reflect.String:
-							debugLog("4pd3r2k42",strValue,field.Name,field.Type,field.Index)
-							debugLog("4pd3r2k42",field.Index[0],newObjValue.Field(field.Index[0]).Type())
-							debugLog("4pd3r2k42",newObjValue.Type(),newObjValue.Field(field.Index[0]).Type())
+							debugLog("4pd3r2k42", strValue, field.Name, field.Type, field.Index)
+							debugLog("4pd3r2k42", field.Index[0], newObjValue.Field(field.Index[0]).Type())
+							debugLog("4pd3r2k42", newObjValue.Type(), newObjValue.Field(field.Index[0]).Type())
 							newObjValue.Field(field.Index[0]).SetString(strValue)
 						case reflect.Bool:
 							boolValue, err := strconv.ParseBool(strValue)
@@ -426,8 +446,6 @@ func parseWebApiObjToMethodMap(obj interface{}) map[string]func(http.ResponseWri
 						}
 					}
 				}
-				newObjValuePtr := newObjValue.Addr().Interface()
-				in = append(in, reflect.ValueOf(newObjValuePtr).Elem())
 				success = true
 				return
 			}
@@ -435,7 +453,6 @@ func parseWebApiObjToMethodMap(obj interface{}) map[string]func(http.ResponseWri
 				contentType := request.Header.Get("Content-Type")
 				switch {
 				case strings.HasPrefix(contentType, "application/json"):
-					in = []reflect.Value{}
 					body, err := ioutil.ReadAll(request.Body)
 					if err != nil {
 						logFunc("u5suypqlv request body read error : " + err.Error())
@@ -450,8 +467,7 @@ func parseWebApiObjToMethodMap(obj interface{}) map[string]func(http.ResponseWri
 						logFunc("fgl7vg91q [ " + typeMethod.Name + " ] json Unmarshal error " + err.Error())
 						return
 					}
-					in = append(in, reflect.ValueOf(newObjValuePtr).Elem())
-					valueMethod.Call(in)
+					valueMethod.Call([]reflect.Value{reflect.ValueOf(newObjValuePtr).Elem()})
 					return
 				//has todo
 				case strings.HasPrefix(contentType, "multipart/form-data"):
@@ -469,9 +485,11 @@ func parseWebApiObjToMethodMap(obj interface{}) map[string]func(http.ResponseWri
 						writer.WriteHeader(400) //bad request
 						return
 					}
-					valueMethod.Call(in)
-				//has todo
-				//and para field can not be struct
+					newObjValuePtr := newObjValue.Addr().Interface()
+					valueMethod.Call([]reflect.Value{reflect.ValueOf(newObjValuePtr).Elem()})
+					return
+					//has todo
+					//and para field can not be struct
 				case strings.HasPrefix(contentType, "application/x-www-form-urlencoded"):
 					if structFlag {
 						debugLog("zzjvz6l3y warning path : [" + typeMethod.Name + "] para has unsupport struct field,if set it's value will return  bad request(http code 400)")
@@ -488,8 +506,8 @@ func parseWebApiObjToMethodMap(obj interface{}) map[string]func(http.ResponseWri
 							writer.WriteHeader(400) //bad request
 							return
 						}
-						debugLog("puyk0y72b", len(in),in)
-						valueMethod.Call(in)
+						newObjValuePtr := newObjValue.Addr().Interface()
+						valueMethod.Call([]reflect.Value{reflect.ValueOf(newObjValuePtr).Elem()})
 						return
 					}
 					//todo get  need to parse body
@@ -501,7 +519,6 @@ func parseWebApiObjToMethodMap(obj interface{}) map[string]func(http.ResponseWri
 					writer.WriteHeader(400) //bad request
 					return
 				}
-				valueMethod.Call(in)
 			}
 		default:
 			logInfo := "jsd4cq0w2 do not support multi para"
