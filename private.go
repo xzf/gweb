@@ -91,6 +91,8 @@ func parseWebApiObjToMethodMap(obj interface{}) map[string]func(http.ResponseWri
 						switch kind {
 						case reflect.String:
 							debugLog("4pd3r2k42",strValue,field.Name,field.Type,field.Index)
+							debugLog("4pd3r2k42",field.Index[0],newObjValue.Field(field.Index[0]).Type())
+							debugLog("4pd3r2k42",newObjValue.Type(),newObjValue.Field(field.Index[0]).Type())
 							newObjValue.Field(field.Index[0]).SetString(strValue)
 						case reflect.Bool:
 							boolValue, err := strconv.ParseBool(strValue)
