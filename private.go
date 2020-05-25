@@ -18,10 +18,15 @@ func debugLog(in ...interface{}) {
 		fmt.Println(in...)
 	}
 }
-
+func newWebApiAndSetCtx(writer http.ResponseWriter, request *http.Request)WebApi{
+	return WebApi{writer:writer,request:request}
+}
 func parseWebApiObjToMethodMap(obj interface{}) map[string]func(http.ResponseWriter, *http.Request) {
 	objType := reflect.TypeOf(obj)
 	objValue := reflect.ValueOf(obj)
+	if objValue.CanAddr(){
+		panic("gusqm25485 gweb.NewHttpRequest.Obj must be ptr")
+	}
 	debugLog("xv58t36dw num of method", objType.NumMethod())
 	methodMap := map[string]func(http.ResponseWriter, *http.Request){}
 	for i := 0; i < objType.NumMethod(); i++ {
@@ -38,6 +43,9 @@ func parseWebApiObjToMethodMap(obj interface{}) map[string]func(http.ResponseWri
 		switch valueMethod.Type().NumIn() {
 		case 0:
 			methodMap[typeMethod.Name] = func(writer http.ResponseWriter, request *http.Request) {
+				newWebObj:=newWebApiAndSetCtx(writer,request)
+				newObj:=reflect.New(objType).Elem()
+				newObj.Field(0).Set(reflect.ValueOf(newWebObj))
 				contentType := request.Header.Get("Content-Type")
 				switch {
 				case strings.HasPrefix(contentType, "application/json"):
@@ -60,7 +68,8 @@ func parseWebApiObjToMethodMap(obj interface{}) map[string]func(http.ResponseWri
 					writer.WriteHeader(400) //bad request
 					return
 				}
-				valueMethod.Call(nil)
+				newObj.MethodByName(methodType.Name()).Call(nil)
+			//	valueMethod.Call(nil)
 			}
 			continue
 		case 1:

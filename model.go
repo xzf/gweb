@@ -8,16 +8,16 @@ package gweb
 
 import (
 	"net/http"
-	"sync"
-	"os"
 )
 
 type WebApi struct {
-	id string
-	httpCtxMap map[string]*httpCtx
-	httpCtxLock sync.Mutex
-	killFunc func()
-	closeChan chan os.Signal
+	//id string
+	//httpCtxMap map[string]*httpCtx
+	//httpCtxLock sync.Mutex
+	//killFunc func()
+	//closeChan chan os.Signal
+	writer http.ResponseWriter
+	request *http.Request
 }
 
 type httpCtx struct {

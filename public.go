@@ -19,7 +19,7 @@ import (
 
 type NewHttpRequest struct {
 	Addr           string
-	Obj            webApiInterface
+	Obj            interface{}
 	Prefix         string
 	FileRootPath   string //can be empty
 	FilePathPrefix string //can be empty
@@ -46,7 +46,7 @@ func NewHttpServer(req NewHttpRequest) {
 		}
 		path := strings.Trim(request.URL.Path, "/")
 		debugLog("pnj27n9nf call api " + path)
-		req.Obj.SetWriter(writer, request) //interface call
+		//req.Obj.SetWriter(writer, request) //interface call
 		debugLog("o09lp1lc4 HandleFunc id", getGoroutineId())
 		debugLog("9bb8941zd call api:", path)
 		method, ok := methodMap[strings.Trim(path, "/")]
